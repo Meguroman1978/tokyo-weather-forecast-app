@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>東京都天気予報アプリ</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>東京都天気予報</h1>
+            <p>市区町村別の天気予報を確認できます</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <div class="ward-selector">
+                    <label for="ward-select">市区町村を選択:</label>
+                    <select id="ward-select">
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
+                <button id="refresh-btn" class="refresh-button">🔄 更新</button>
+            </div>
+
+            <div class="weather-info" id="weather-info">
+                <div class="placeholder">
+                    <p>市区町村を選択して天気予報を確認してください</p>
+                </div>
+            </div>
+
+            <div class="forecast-container" id="forecast-container">
+                <!-- 5日間天気予報がここに表示される -->
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
