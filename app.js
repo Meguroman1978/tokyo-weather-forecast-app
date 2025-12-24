@@ -170,7 +170,8 @@ async function handleWardSelection(event) {
         showLoading();
         await fetchWeatherData(selectedWard);
     } catch (error) {
-        showError('天気データの取得に失敗しました。しばらく待ってから再試行してください。');
+        const errorType = error.message || 'UNKNOWN_ERROR';
+        showError(errorType);
         console.error('Weather fetch error:', error);
     }
 }
@@ -188,41 +189,68 @@ async function handleRefresh() {
         showLoading();
         await fetchWeatherData(selectedWard);
     } catch (error) {
-        showError('天気データの取得に失敗しました。');
+        const errorType = error.message || 'UNKNOWN_ERROR';
+        showError(errorType);
         console.error('Weather refresh error:', error);
     }
 }
 
 // 天気データを取得
 async function fetchWeatherData(wardName) {
+    // APIキーのチェック
+    if (API_KEY === 'YOUR_API_KEY_HERE' || !API_KEY) {
+        throw new Error('API_KEY_NOT_SET');
+    }
+    
     const coordinates = TOKYO_WARDS[wardName];
     if (!coordinates) {
         throw new Error('Location not found');
     }
     
-    // 現在天気を取得
-    const currentWeatherUrl = `${BASE_URL}/weather?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${API_KEY}&units=metric&lang=ja`;
-    const currentResponse = await fetch(currentWeatherUrl);
-    
-    if (!currentResponse.ok) {
-        throw new Error(`Weather API error: ${currentResponse.status}`);
+    try {
+        // 現在天気を取得
+        const currentWeatherUrl = `${BASE_URL}/weather?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${API_KEY}&units=metric&lang=ja`;
+        const currentResponse = await fetch(currentWeatherUrl);
+        
+        if (!currentResponse.ok) {
+            if (currentResponse.status === 401) {
+                throw new Error('INVALID_API_KEY');
+            } else if (currentResponse.status === 429) {
+                throw new Error('API_RATE_LIMIT');
+            } else {
+                throw new Error(`API_ERROR_${currentResponse.status}`);
+            }
+        }
+        
+        const currentWeather = await currentResponse.json();
+        
+        // 5日間予報を取得
+        const forecastUrl = `${BASE_URL}/forecast?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${API_KEY}&units=metric&lang=ja`;
+        const forecastResponse = await fetch(forecastUrl);
+        
+        if (!forecastResponse.ok) {
+            if (forecastResponse.status === 401) {
+                throw new Error('INVALID_API_KEY');
+            } else if (forecastResponse.status === 429) {
+                throw new Error('API_RATE_LIMIT');
+            } else {
+                throw new Error(`API_ERROR_${forecastResponse.status}`);
+            }
+        }
+        
+        const forecastData = await forecastResponse.json();
+        
+        // データを表示
+        displayCurrentWeather(currentWeather, wardName);
+        displayForecast(forecastData);
+        
+    } catch (error) {
+        // ネットワークエラーの處理
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error('NETWORK_ERROR');
+        }
+        throw error;
     }
-    
-    const currentWeather = await currentResponse.json();
-    
-    // 5日間予報を取得
-    const forecastUrl = `${BASE_URL}/forecast?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${API_KEY}&units=metric&lang=ja`;
-    const forecastResponse = await fetch(forecastUrl);
-    
-    if (!forecastResponse.ok) {
-        throw new Error(`Forecast API error: ${forecastResponse.status}`);
-    }
-    
-    const forecastData = await forecastResponse.json();
-    
-    // データを表示
-    displayCurrentWeather(currentWeather, wardName);
-    displayForecast(forecastData);
 }
 
 // 現在天気を表示
@@ -337,10 +365,52 @@ function showPlaceholder() {
 }
 
 // エラー表示
-function showError(message) {
+function showError(errorType) {
+    let message = '';
+    let details = '';
+    
+    switch(errorType) {
+        case 'API_KEY_NOT_SET':
+            message = 'APIキーが設定されていません';
+            details = 'OpenWeatherMapからAPIキーを取得し、app.jsの4行目でAPI_KEYを設定してください。';
+            break;
+        case 'INVALID_API_KEY':
+            message = 'APIキーが無効です';
+            details = '正しいOpenWeatherMap APIキーを設定してください。';
+            break;
+        case 'API_RATE_LIMIT':
+            message = 'API利用制限に達しています';
+            details = 'しばらく待ってから再試行してください。';
+            break;
+        case 'NETWORK_ERROR':
+            message = 'ネットワークエラーが発生しました';
+            details = 'インターネット接続を確認してください。';
+            break;
+        case 'API_ERROR_404':
+            message = 'APIエンドポイントが見つかりません';
+            details = 'APIの仕様が変更された可能性があります。';
+            break;
+        case 'API_ERROR_500':
+            message = 'サーバーエラーが発生しました';
+            details = 'OpenWeatherMapサーバーに問題があります。しばらく待ってから再試行してください。';
+            break;
+        default:
+            message = '天気データの取得に失敗しました';
+            details = errorType.includes('API_ERROR_') ? 
+                `APIエラー (${errorType.split('_')[2]})が発生しました。` : 
+                'しばらく待ってから再試行してください。';
+    }
+    
     weatherInfo.innerHTML = `
         <div class="error">
-            <p>${message}</p>
+            <h3>⚠️ ${message}</h3>
+            <p>${details}</p>
+            <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 0.9rem;">
+                <strong>設定手順:</strong><br>
+                1. <a href="https://openweathermap.org/api" target="_blank" style="color: #007bff;">OpenWeatherMap</a>でアカウントを作成<br>
+                2. APIキーを取得<br>
+                3. app.jsの4行目の「YOUR_API_KEY_HERE」を実際のAPIキーに変更
+            </div>
         </div>
     `;
     forecastContainer.innerHTML = '';
